@@ -1,0 +1,26 @@
+# Temporary and editor files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build and distribution artifacts
+build/
+*.spec
+*.egg-info/
+
+# Project-specific backup folder
+web_backup/
