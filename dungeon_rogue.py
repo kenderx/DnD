@@ -286,7 +286,7 @@ class GameState:
         elif chest and chest.opened:
             self.log("This chest is empty.", C_TEXT_DIM)
         elif self.dungeon.tiles[self.player_row][self.player_col] == STAIRS:
-            self.log("Press '>' to descend the stairs.", C_TEXT_BLUE)
+            self.log("Press 'e' to descend the stairs.", C_TEXT_BLUE)
         else:
             self.log("Nothing to pick up here.", C_TEXT_DIM)
 
@@ -796,7 +796,7 @@ def main():
                     gs.open_chest()
                     moved = True
 
-                elif key == pygame.K_GREATER or (key == pygame.K_PERIOD and
+                elif key == pygame.K_e or key == pygame.K_GREATER or (key == pygame.K_PERIOD and
                      pygame.key.get_mods() & pygame.KMOD_SHIFT):
                     gs.descend_stairs()
                     moved = True
