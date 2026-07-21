@@ -246,7 +246,7 @@ def _count_monsters(floor: int) -> int:
 
 
 def _count_chests(floor: int) -> int:
-    return random.randint(1, max(1, floor // 3 + 1))
+    return random.randint(3, 3*max(1, floor // 3 + 1))
 
 
 def generate_floor(floor_num: int, seed: Optional[int] = None) -> DungeonFloor:
