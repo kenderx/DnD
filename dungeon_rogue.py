@@ -817,8 +817,19 @@ class Renderer:
         log_y = SCREEN_H - (LOG_LINES * 18 + 14)
         pygame.draw.rect(surf, (12, 12, 20), (hx, log_y - 4, HUD_W, SCREEN_H - log_y + 4))
         pygame.draw.line(surf, C_HUD_BORDER, (hx + 5, log_y - 4), (SCREEN_W - 5, log_y - 4))
-        for i, (msg, color) in enumerate(gs.messages[-(LOG_LINES):]):
-            t = self.fonts["sm"].render(msg[:52], True, color)
+        import textwrap
+        display_lines = []
+        for msg, color in reversed(gs.messages):
+            wrapped = textwrap.wrap(msg, width=30)
+            for line in reversed(wrapped):
+                display_lines.append((line, color))
+                if len(display_lines) >= LOG_LINES:
+                    break
+            if len(display_lines) >= LOG_LINES:
+                break
+        display_lines.reverse()
+        for i, (line, color) in enumerate(display_lines):
+            t = self.fonts["sm"].render(line, True, color)
             surf.blit(t, (hx + 8, log_y + i * 18))
 
     def draw_game_over(self, gs: GameState):
