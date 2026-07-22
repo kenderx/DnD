@@ -253,7 +253,7 @@ def generate_loot(floor: int) -> Item:
 
 def gold_for_floor(floor: int) -> int:
     """Return a random gold amount suitable for the given floor."""
-    base = floor * 10
+    base = floor * 30
     return random.randint(base, base * 3)
 
 
@@ -282,17 +282,17 @@ class MonsterTemplate:
 
 
 MONSTER_TEMPLATES: List[MonsterTemplate] = [
-    MonsterTemplate("Rat",      "r", (160,  80,  40),  2,  10, 0, (1, 4),  0,   5, min_floor=1,  max_floor=3),
-    MonsterTemplate("Goblin",   "g", ( 80, 160,  40), 12,  12, 4, (1, 6),  2,  25, min_floor=1,  max_floor=8),
-    MonsterTemplate("Skeleton", "s", (200, 200, 200), 18,  13, 4, (1, 6),  2,  50, min_floor=2,  max_floor=12),
-    MonsterTemplate("Zombie",   "z", ( 80, 120,  40), 30,   8, 3, (1, 6),  1,  50, min_floor=3,  max_floor=12),
-    MonsterTemplate("Orc",      "O", (100, 160,  60), 25,  13, 5, (2, 6),  3, 100, min_floor=4,  max_floor=14),
-    MonsterTemplate("Gnoll",    "n", (180, 140,  80), 22,  15, 5, (2, 4),  3, 100, min_floor=5,  max_floor=16),
-    MonsterTemplate("Bugbear",  "B", (120,  80,  40), 40,  14, 6, (2, 8),  4, 200, min_floor=7,  max_floor=18),
-    MonsterTemplate("Troll",    "T", ( 60, 160,  60), 84,  15, 7, (2, 6),  4, 700, min_floor=11, max_floor=20),
-    MonsterTemplate("Wight",    "W", ( 80, 100, 140), 45,  14, 6, (1, 6),  4, 450, min_floor=9,  max_floor=20),
-    MonsterTemplate("Vampire",  "V", (140,  20,  20), 80,  15, 8, (1, 8),  5,1800, min_floor=15, max_floor=20),
-    MonsterTemplate("Owlbear",  "*", (120,  80,  20),120,  13, 7, (2, 8),  5,2300, min_floor=20, max_floor=20),
+    MonsterTemplate("Rat",      "r", (160,  80,  40),  2,  10, 0, (1, 4),  0,  15, min_floor=1,  max_floor=3),
+    MonsterTemplate("Goblin",   "g", ( 80, 160,  40), 12,  12, 4, (1, 6),  2,  75, min_floor=1,  max_floor=8),
+    MonsterTemplate("Skeleton", "s", (200, 200, 200), 18,  13, 4, (1, 6),  2, 150, min_floor=2,  max_floor=12),
+    MonsterTemplate("Zombie",   "z", ( 80, 120,  40), 30,   8, 3, (1, 6),  1, 150, min_floor=3,  max_floor=12),
+    MonsterTemplate("Orc",      "O", (100, 160,  60), 25,  13, 5, (2, 6),  3, 300, min_floor=4,  max_floor=14),
+    MonsterTemplate("Gnoll",    "n", (180, 140,  80), 22,  15, 5, (2, 4),  3, 300, min_floor=5,  max_floor=16),
+    MonsterTemplate("Bugbear",  "B", (120,  80,  40), 40,  14, 6, (2, 8),  4, 600, min_floor=7,  max_floor=18),
+    MonsterTemplate("Troll",    "T", ( 60, 160,  60), 84,  15, 7, (2, 6),  4,2100, min_floor=11, max_floor=20),
+    MonsterTemplate("Wight",    "W", ( 80, 100, 140), 45,  14, 6, (1, 6),  4,1500, min_floor=9,  max_floor=20),
+    MonsterTemplate("Vampire",  "V", (140,  20,  20), 80,  15, 8, (1, 8),  5,5500, min_floor=15, max_floor=20),
+    MonsterTemplate("Owlbear",  "*", (120,  80,  20),120,  13, 7, (2, 8),  5,6900, min_floor=20, max_floor=20),
 ]
 
 

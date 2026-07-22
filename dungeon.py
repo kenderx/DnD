@@ -70,6 +70,11 @@ class Monster:
     restrained_turns: int = 0
     alerted: bool = False
     path: List[Tuple[int, int]] = field(default_factory=list)
+    behavior: str = "Wander"
+    behavior_turns_left: int = 20
+    look_dir: Tuple[int, int] = (0, 1)
+    patrol_points: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
+    patrol_target: Optional[Tuple[int, int]] = None
 
     @property
     def name(self) -> str:
@@ -78,6 +83,43 @@ class Monster:
     @property
     def pos(self) -> Tuple[int, int]:
         return (self.row, self.col)
+
+    def initialize_behavior(self, dungeon_floor: DungeonFloor):
+        self.behavior = random.choice(["Guard", "Patrol", "Sleep", "Wander"])
+        self.behavior_turns_left = 20
+        self.look_dir = random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)])
+        self.patrol_points = None
+        self.patrol_target = None
+        
+        if self.behavior == "Patrol":
+            pt_a = (self.row, self.col)
+            pt_b = pt_a
+            # Try to find a valid second patrol point
+            rooms = dungeon_floor.rooms
+            if rooms:
+                shuffled_rooms = list(rooms)
+                random.shuffle(shuffled_rooms)
+                found = False
+                for room in shuffled_rooms:
+                    inner = room.inner_tiles()
+                    if not inner:
+                        continue
+                    shuffled_tiles = list(inner)
+                    random.shuffle(shuffled_tiles)
+                    for tile in shuffled_tiles:
+                        if tile != pt_a and dungeon_floor.is_passable(*tile):
+                            # Check if there is an A* path
+                            from pathfinding import astar
+                            path = astar(pt_a, tile, lambda r, c: dungeon_floor.is_passable(r, c))
+                            if path and 1 < len(path) <= 15:
+                                pt_b = tile
+                                found = True
+                                break
+                    if found:
+                        break
+            self.patrol_points = (pt_a, pt_b)
+            self.patrol_target = pt_b
+
 
 
 @dataclass
@@ -103,7 +145,7 @@ class Chest:
         if not self.opened:
             self.opened = True
             self.gold  = gold_for_floor(self.floor)
-            self.loot  = generate_loot(self.floor) if random.random() < 0.75 else None
+            self.loot  = generate_loot(self.floor) if random.random() < 0.95 else None
 
 
 @dataclass
@@ -330,7 +372,7 @@ def generate_floor(floor_num: int, seed: Optional[int] = None) -> DungeonFloor:
         kind = random.choice(trap_kinds)
         pre_traps.append(Trap(kind=kind, row=pos[0], col=pos[1], owner="dungeon"))
 
-    return DungeonFloor(
+    floor = DungeonFloor(
         floor_num    = floor_num,
         tiles        = tiles,
         rooms        = rooms,
@@ -341,6 +383,10 @@ def generate_floor(floor_num: int, seed: Optional[int] = None) -> DungeonFloor:
         chests       = chests,
         wall_torches = wall_torches,
     )
+    for m in monsters:
+        m.initialize_behavior(floor)
+    return floor
+
 
 
 def _recursive_split(node: _BSPNode, depth: int):

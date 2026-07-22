@@ -287,8 +287,6 @@ class GameState:
             self.log("This chest is empty.", C_TEXT_DIM)
         elif self.dungeon.tiles[self.player_row][self.player_col] == STAIRS:
             self.log("Press 'e' to descend the stairs.", C_TEXT_BLUE)
-        else:
-            self.log("Nothing to pick up here.", C_TEXT_DIM)
 
     def descend_stairs(self):
         if (self.player_row, self.player_col) == self.dungeon.stairs_pos:
@@ -305,8 +303,6 @@ class GameState:
             self.mirror_visible.clear()
             self._update_fov()
             self.log(f"You descend to floor {self.floor_num}.", C_TEXT_BLUE)
-        else:
-            self.log("You are not on the stairs.", C_TEXT_DIM)
 
     def use_potion(self):
         inv = self.rogue.inventory
@@ -388,13 +384,84 @@ class GameState:
                 if (pr, pc) in mon_visible:
                     # Stealth contest
                     stealth = r.stealth_check()
+                    # Passive perception modifications
                     pp = monster.template.passive_perception
+                    if getattr(monster, "behavior", None) == "Sleep":
+                        pp -= 5
+                    
+                    # Directional perception modifiers
+                    look_dr, look_dc = getattr(monster, "look_dir", (0, 1))
+                    v_r, v_c = pr - mr, pc - mc
+                    dot = v_r * look_dr + v_c * look_dc
+                    if dot > 0:
+                        pp += 5
+                    elif dot < 0:
+                        pp -= 5
+
                     if stealth < pp:
                         monster.alerted = True
                         self.log(f"The {monster.name} spots you!", C_TEXT_RED)
 
             if not monster.alerted:
-                continue  # Patrol / idle
+                # Tick behavior countdown
+                if hasattr(monster, "behavior_turns_left"):
+                    monster.behavior_turns_left -= 1
+                    if monster.behavior_turns_left <= 0:
+                        monster.initialize_behavior(self.dungeon)
+
+                # Execute behavior
+                b = getattr(monster, "behavior", "Wander")
+                if b == "Guard":
+                    monster.look_dir = random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)])
+                elif b == "Sleep":
+                    # Do not move, do not change look direction
+                    pass
+                elif b == "Wander":
+                    dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                    random.shuffle(dirs)
+                    moved = False
+                    for dr, dc in dirs:
+                        nr, nc = mr + dr, mc + dc
+                        if self.dungeon.is_passable(nr, nc) and not self.dungeon.monster_at(nr, nc) and (nr, nc) != (pr, pc):
+                            # Check for trap
+                            trap = self.dungeon.trap_at(nr, nc)
+                            if trap and trap.owner == "player":
+                                self._trigger_trap(trap, monster, is_player=False)
+                                if monster.hp <= 0:
+                                    xp = monster.template.xp
+                                    self.log(f"{monster.name} is killed by your trap! +{xp} XP", C_TEXT_GOLD)
+                                    self.rogue.gain_xp(xp)
+                                    self.dungeon.monsters.remove(monster)
+                                    moved = True
+                                    break
+                            monster.row, monster.col = nr, nc
+                            monster.look_dir = (dr, dc)
+                            moved = True
+                            break
+                elif b == "Patrol":
+                    if monster.patrol_points and monster.patrol_target:
+                        path = astar(
+                            (mr, mc), monster.patrol_target,
+                            lambda row, col: self.dungeon.is_passable(row, col)
+                        )
+                        if path and len(path) > 1:
+                            nr, nc = path[1]
+                            monster.look_dir = (nr - mr, nc - mc)
+                            if not self.dungeon.monster_at(nr, nc) and (nr, nc) != (pr, pc):
+                                trap = self.dungeon.trap_at(nr, nc)
+                                if trap and trap.owner == "player":
+                                    self._trigger_trap(trap, monster, is_player=False)
+                                    if monster.hp <= 0:
+                                        xp = monster.template.xp
+                                        self.log(f"{monster.name} is killed by your trap! +{xp} XP", C_TEXT_GOLD)
+                                        self.rogue.gain_xp(xp)
+                                        self.dungeon.monsters.remove(monster)
+                                        continue
+                                monster.row, monster.col = nr, nc
+                        if (monster.row, monster.col) == monster.patrol_target:
+                            pt_a, pt_b = monster.patrol_points
+                            monster.patrol_target = pt_a if monster.patrol_target == pt_b else pt_b
+                continue  # Skip chasing logic
 
             # Pathfind toward player
             path = astar(
@@ -403,6 +470,7 @@ class GameState:
             )
             if path and len(path) > 1:
                 nr, nc = path[1]
+                monster.look_dir = (nr - mr, nc - mc)
                 # Check if moving onto a trap
                 trap = self.dungeon.trap_at(nr, nc)
                 if trap and trap.owner == "player":
@@ -591,12 +659,51 @@ class Renderer:
         pygame.draw.circle(surf, color, (cx, cy), r)
         sym = self.fonts["sm"].render(m.template.symbol, True, (255, 255, 255))
         surf.blit(sym, sym.get_rect(center=(cx, cy)))
+
+        # Draw look direction indicator
+        dr, dc = getattr(m, "look_dir", (0, 1))
+        if m.alerted:
+            ind_color = (255, 50, 50)
+        else:
+            b = getattr(m, "behavior", "Wander")
+            if b == "Guard":
+                ind_color = (255, 215, 0)
+            elif b == "Patrol":
+                ind_color = (50, 205, 50)
+            elif b == "Sleep":
+                ind_color = (135, 206, 235)
+            else: # Wander
+                ind_color = (255, 140, 0)
+
+        # Tip of arrowhead
+        tip_x = cx + dc * (r + 3)
+        tip_y = cy + dr * (r + 3)
+        # Base of arrowhead
+        base_x = cx + dc * r
+        base_y = cy + dr * r
+        # Perpendicular vector
+        perpx = -dr
+        perpy = dc
+        # Arrow base corners
+        p1_x = base_x + perpx * 3
+        p1_y = base_y + perpy * 3
+        p2_x = base_x - perpx * 3
+        p2_y = base_y - perpy * 3
+
+        pygame.draw.polygon(surf, ind_color, [(tip_x, tip_y), (p1_x, p1_y), (p2_x, p2_y)])
+
+        # Sleeping visual effect (a small "z" near the top right of the monster)
+        if getattr(m, "behavior", None) == "Sleep" and not m.alerted:
+            z_txt = self.fonts["sm"].render("z", True, (135, 206, 235))
+            surf.blit(z_txt, (sx + CELL - 6, sy - 4))
+
         # HP bar
         if m.hp < m.max_hp:
             bw = CELL - 2; bh = 2
             bx = sx + 1; by = sy + CELL - 3
             pygame.draw.rect(surf, (80, 0, 0),   (bx, by, bw, bh))
             pygame.draw.rect(surf, (0, 200, 0),  (bx, by, int(bw * m.hp / m.max_hp), bh))
+
 
     def draw_hud(self, gs: GameState):
         surf = self.screen
@@ -694,15 +801,14 @@ class Renderer:
         text("── CONTROLS ──", C_TEXT_DIM, "sm")
         controls = [
             "Arrows/WASD Move/Attack",
-            "G  Open chest / pick up",
-            ">  Descend stairs",
+            "E  Open/Pick Up/Descend",
             "H  Use potion",
             "M  Use small mirror",
             "1  Place caltrops",
             "2  Place bear trap",
             "3  Place gas trap",
             "4  Apply blade poison",
-            ".  Pass turn",
+            "Space/./Z/5 Pass turn (Wait)",
         ]
         for c in controls:
             text(c, C_TEXT_DIM, "sm")
@@ -789,15 +895,11 @@ def main():
                 if key in dirs:
                     moved = gs.try_move(*dirs[key])
 
-                elif key in (pygame.K_PERIOD, pygame.K_SPACE):
+                elif key in (pygame.K_PERIOD, pygame.K_SPACE, pygame.K_z, pygame.K_KP_5):
                     moved = True   # pass turn
 
-                elif key == pygame.K_g:
+                elif key == pygame.K_e:
                     gs.open_chest()
-                    moved = True
-
-                elif key == pygame.K_e or key == pygame.K_GREATER or (key == pygame.K_PERIOD and
-                     pygame.key.get_mods() & pygame.KMOD_SHIFT):
                     gs.descend_stairs()
                     moved = True
 

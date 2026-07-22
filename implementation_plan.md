@@ -1,153 +1,71 @@
-# Implementation Plan: Standalone D&D 5.2.1 Rogue Roguelike
+# Add Monster Behaviors and Look-Direction Perception
 
-We are building a standalone Windows executable (`.exe`) game in **Python** using **Pygame**, compiled via **PyInstaller** (`pyinstaller --onefile --noconsole`). The game is a tactical, grid-based, top-down solo Roguelike centered on a D&D Rogue exploring dark dungeons, setting traps, applying poisons, and executing Sneak Attacks.
+Implement modular AI behaviors for monsters when they are not chasing the player, update their perception based on their looking direction, and render a premium-looking direction/state indicator.
 
 ## User Review Required
 
-> [!IMPORTANT]
-> **Windows EXE Toolchain:**
-> - Based on system environment checks, **Python 3.11.9** and **Node.js** are installed. Compiler toolchains like `g++`, `dotnet`, and `MSVC` are missing.
-> - Therefore, we will build the game in **Python** using the **Pygame** library, and compile it to a standalone `.exe` using **PyInstaller** (`pyinstaller --onefile --noconsole`).
-> - This delivers a zero-dependency, double-clickable Windows executable.
-
-> [!WARNING]
-> **Old Web Project Backup:**
-> - To make room for the new Python structure in the workspace `c:\Users\Makhew3\antigravity\DnD`, the previous HTML/CSS/JS files will be moved into a subdirectory named `web_backup/`.
-
----
-
-## Game Design & SRD 5.2.1 Rules Integration
-
-### 1. 20-Floor Dungeon & Level Progression
-- The dungeon has **20 floors**. The stairs down to the next floor must be found by exploring the map.
-- The game is balanced so that the Rogue's level corresponds to the current dungeon floor (e.g. Floor 1 is balanced for Level 1, Floor 5 for Level 5, up to Floor 20 for Level 20).
-- Level progression is tied directly to exploring, killing monsters, and looting treasure gold (which awards XP). Clearing most of Floor N will award enough XP to reach Level N+1, preparing the Rogue for Floor N+1.
-- Rogue stats scale up to Level 20:
-  - **HP Increase**: `5 + CON mod` (+1 CON = +6 HP) per level. Starts at 9 HP.
-  - **Sneak Attack**: Every attack from the Rogue is a Sneak Attack. Damage starts at `2d6` and increases by `1d6` every odd level (standard D&D rogue sneak scaling, e.g., level 3: 2d6, level 5: 3d6, level 20: 10d6).
-
-### 2. Equipment Slots & Inventory
-- The player can equip:
-  - **1 Weapon** (either Dagger or Shortbow; switching is a Free Action).
-  - **1 Set of Armor**.
-  - **Up to 3 Equipable Items** (skills or stat bonuses).
-- Unequipped items, consumable traps, poison vials, and Thieves' Tools are kept in the general Inventory.
-
-### 3. Treasure Rooms & Level-Appropriate Loot
-Chests hidden in rooms contain loot determined dynamically based on the current floor's level:
-- **Gold**: Directly adds to gold count and awards equivalent XP.
-- **Weapons**:
-  - Floors 1-4: Dagger (+0, 1d4), Shortbow (+0, 1d6)
-  - Floors 5-9: +1 Weapons (Dagger/Shortbow +1 to hit/damage)
-  - Floors 10-14: +2 Weapons, Flame Tongue Dagger (+1d6 fire damage)
-  - Floors 15-20: +3 Weapons, Dagger of Venom (+1d6 poison, applies poisoned condition)
-- **Armor**:
-  - Floors 1-4: Leather Armor (AC 11), Studded Leather (AC 12)
-  - Floors 5-9: Studded Leather +1 (AC 13)
-  - Floors 10-14: Studded Leather +2 (AC 14)
-  - Floors 15-20: Studded Leather +3 (AC 15)
-- **Special Items**:
-  - **Small Mirror**: Reusable utility item in inventory. Using it adjacent to a corner or closed door reveals the tiles on the other side (calculates a temporary FOV sweep from the adjacent tile), allowing the player to spot patrols/traps without stepping out.
-  - **Potions of Healing (SRD defined)**: Consumable healing items.
-    - *Potion of Healing* (Common, Floors 1-5): Heals `2d4 + 2` HP.
-    - *Potion of Greater Healing* (Uncommon, Floors 6-10): Heals `4d4 + 4` HP.
-    - *Potion of Superior Healing* (Rare, Floors 11-15): Heals `8d4 + 8` HP.
-    - *Potion of Supreme Healing* (Very Rare, Floors 16-20): Heals `10d4 + 20` HP.
-  - **Gem of Trueseeing**: Equipable slot item. Grants the player **Darkvision** (allows the player to see up to 6 tiles in pitch black without using a torch, letting them sneak in shadows) and adds **+5 to Passive Perception** (making it easy to spot hidden traps and ambushes).
-  - *Ring of Protection*: +1 AC.
-  - *Boots of Elvenkind*: +3 to Stealth.
-  - *Gloves of Thievery*: +3 to Thieves' Tools / lockpicking and trap disarming.
-  - *Cloak of Protection*: +1 AC and +1 to all saving throws.
-  - *Amulet of Health*: Sets CON to 14 (+2 mod) or increases Max HP by +10.
-
-### 4. Traps & Poison Systems
-The Rogue can set three types of mechanical and chemical traps on walkable grid tiles:
-- **Caltrops (Consumable)**: Deals 1d4 piercing damage, cuts monster speed in half, and alerts nearby patrols with noise.
-- **Bear Trap (Consumable)**: Deals 2d6 piercing damage and inflicts the *Restrained* condition (speed = 0) for 2 turns.
-- **Poison Gas Trap (Consumable)**: Triggers a 3x3 toxic cloud. Deals 1d8 poison damage and inflicts the *Poisoned* condition.
-- **Blade Poison (Consumable)**: Consumes a poison vial to coat the rogue's dagger or shortbow. The next 3 hits deal +1d6 extra poison damage and apply the *Poisoned* condition (disadvantage on attack rolls, DC 11 Constitution save to resist).
-
-### 5. Light and Vision (Dynamic Lighting FOV)
-- The dungeon is pitch black.
-- The player carries a **Torch** that casts dynamic light using **Symmetric Shadowcasting** (base light radius: 5 tiles, modifiable by items).
-- Walls block light, creating realistic shadows.
-- Static wall torches are scattered across rooms to create glowing safe pockets.
-- **Darkvision**: Monsters have Darkvision (6 tiles), meaning they can see the player in the dark. The player must rely on **Stealth** and wall placement to avoid detection.
-
-### 6. Monsters & Combat Loop
-- High hit points relative to the Rogue:
-  - **Goblin**: 12 HP, AC 12, deals 1d6+2 damage.
-  - **Skeleton**: 18 HP, AC 13, deals 1d6+2 damage.
-  - **Zombie**: 30 HP, AC 8, deals 1d6+1 damage.
-  - **Orc**: 25 HP, AC 13, deals 1d12+3 damage.
-  - **Owlbear (Floor 20 Boss)**: 120 HP, AC 13, deals 2d8+5 damage.
-- Turn-based movement: Time moves only when the Rogue moves or performs an action (classic Roguelike).
-- If a monster spots the player (or hears a trap trigger), it pathfinds toward the player using A*.
-
----
-
-## Proposed Architecture
-
-We will create the following files inside `c:\Users\Makhew3\antigravity\DnD/`:
-
-```
-c:\Users\Makhew3\antigravity\DnD/
-├── dungeon_rogue.py        # Main Entry: Pygame loop, drawing, input, and GUI panels
-├── rules.py                # SRD calculations: dice, stealth checks, levels, damage, poison state
-├── fov.py                  # FOV Module: Symmetric Shadowcasting (Albert Ford) lighting calculations
-├── pathfinding.py          # Path Module: BFS (movement/trap ranges) and A* (monster AI chase)
-├── dungeon.py              # Map Module: Procedural BSP dungeon map generator (20 levels)
-└── build.bat               # Build utility script compiling to EXE via PyInstaller
-```
-
----
+> [!NOTE]
+> The behaviors are randomly chosen upon spawn and cycle every 20 rounds for each monster individually when they are not alert. This creates a natural, asynchronous movement flow in the dungeon.
+> We will also implement a visual indicator (colored arrowheads) at the edge of the monster circle to show where they are looking:
+> - **Guard**: Yellow arrow (changes look direction randomly every turn)
+> - **Patrol**: Green arrow (moves back and forth between two points, looking forward)
+> - **Sleep**: Light blue arrow, and a small "z" floating next to them (does not move/look around, -5 PP penalty)
+> - **Wander**: Orange arrow (moves randomly, looking in the last moved direction)
+> - **Alerted (Chasing)**: Bright red arrow (chases player, looking towards the player or movement direction)
 
 ## Proposed Changes
 
-### [Backup Old Files]
-- Move existing `index.html`, `style.css`, and `js/` folder into `web_backup/` to clear the workspace.
+### Game Rules & Dungeon State
 
-### [Game Implementation]
+#### [MODIFY] [dungeon.py](file:///c:/Users/Makhew3/antigravity/DnD/dungeon.py)
 
-#### [NEW] fov.py
-- Implements `round_ties_up`, `round_ties_down`, `Quadrant`, and `Row` classes.
-- Core recursive `scan` function that updates a grid representation with light levels (1.0 = lit, 0.5 = dim, 0.0 = dark).
+- Modify the `Monster` dataclass:
+  - Add fields for `behavior`, `behavior_turns_left`, `look_dir` (as `Tuple[int, int]`), `patrol_points`, and `patrol_target`.
+  - Add `initialize_behavior(self, dungeon_floor)` method to set or randomly transition behaviors. It will automatically find a second valid tile for the patrol points if the chosen behavior is **Patrol**, using pathfinding to ensure reachability.
+- In `generate_floor`, call `initialize_behavior` on all generated monsters after the `DungeonFloor` is created.
 
-#### [NEW] pathfinding.py
-- BFS flood fill for checking trap ranges and path indicators.
-- A* algorithm using Manhattan distance to return path list for monster AI.
+### Monster Turn & Detection Logic
 
-#### [NEW] dungeon.py
-- Procedural BSP (Binary Space Partitioning) map generator: splits map into grid cells, places rectangular rooms, and connects them with L-shaped corridors.
-- Handles generation of 20 floors, placing stairs down, wall torches, traps, chests, and spawning level-appropriate monsters.
+#### [MODIFY] [dungeon_rogue.py](file:///c:/Users/Makhew3/antigravity/DnD/dungeon_rogue.py)
 
-#### [NEW] rules.py
-- Roll functions (`1d20+5`, `2d6`) with advantage/disadvantage.
-- Rogue character sheet stats (HP, Level, XP, Gold, Poison Vials, Traps, Equipment Slots, Inventory).
-- Item templates and loot generator (random items scaled by floor level).
-- Stealth check resolution and Sneak Attack damage multipliers.
+- Update `_monster_turn` in `GameState`:
+  - If a monster is not alerted:
+    - Tick down `behavior_turns_left`.
+    - If it reaches 0, call `initialize_behavior` to choose a new behavior randomly.
+    - Run the specific behavior actions:
+      - **Guard**: Select a random look direction from `[(-1,0), (1,0), (0,-1), (0,1)]`.
+      - **Patrol**: Pathfind toward `patrol_target`. If the next step is valid, move and look in that direction. If arrived at `patrol_target`, swap the target to the other patrol point.
+      - **Sleep**: Do not move, do not change look direction.
+      - **Wander**: Select a random valid adjacent tile to move to. If moved, update the look direction.
+  - If a monster *is* alerted and chasing:
+    - Update look direction to point to their next move or attack target.
+- Update the **Detection/Stealth** check inside `_monster_turn`:
+  - Calculate effective passive perception `pp` by applying:
+    - `-5` if the monster is in the **Sleep** behavior.
+    - `+5` if looking in the direction of the player (positive dot product between the look direction and the vector from monster to player).
+    - `-5` if looking away from the player (negative dot product).
 
-#### [NEW] dungeon_rogue.py
-- Sets up Pygame window (1024x768), grid cell rendering (40x40 pixel cells), and programmatic drawing for assets (using vectors/circles/lines so no external images are required).
-- Event handler (Arrows/WASD for movement, numbers for traps/poison, Space to pass turn).
-- HUD side panels showing player stats, item slots, and a scrolling message log.
-- Turn manager: player takes an action, then all active monsters execute their AI steps.
+### Visual Rendering
 
-#### [NEW] build.bat
-- Installs `pygame-ce` and `pyinstaller` via pip.
-- Runs `pyinstaller --onefile --noconsole --name=dungeon_rogue dungeon_rogue.py`.
-- Copies the final binary from `dist/dungeon_rogue.exe` to the project root for easy launch.
+#### [MODIFY] [dungeon_rogue.py](file:///c:/Users/Makhew3/antigravity/DnD/dungeon_rogue.py)
 
----
+- Update `_draw_monster` in the `Renderer` class:
+  - Determine indicator color based on the current state:
+    - Alerted (chasing): Red `(255, 50, 50)`
+    - Guard: Yellow `(255, 215, 0)`
+    - Patrol: Green `(50, 205, 50)`
+    - Sleep: Light blue `(135, 206, 235)`
+    - Wander: Orange `(255, 140, 0)`
+  - Draw a neat arrowhead polygon pointing in `m.look_dir` along the edge of the monster circle.
+  - If the monster is asleep (`m.behavior == "Sleep" and not m.alerted`), render a small `"z"` next to them to make their status immediately recognizable.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `python dungeon_rogue.py` locally and verify the window opens.
-- The console will output rule engine diagnostic tests on launch (verifying math, dice rolls, and fov calculations).
+- Run `python -m unittest discover -s tests` to ensure existing game tests continue to pass.
+- Write new tests to verify behavior assignment and the perception modifiers based on looking direction.
 
 ### Manual Verification
-- Verify that moving blocks light behind walls correctly.
-- Place caltrops and bear traps, lure monsters into them, and verify that damage is applied and statuses are reflected.
-- Apply blade poison, attack an Orc, and ensure Sneak Attack + Poison Damage logs appear in the message area.
-- Verify compiling to `.exe` runs successfully and yields a launchable executable.
+- Run the Pygame client using `python dungeon_rogue.py`.
+- Observe monster movement in unexplored rooms or when sneak status is active.
+- Verify that sleep states, wandering paths, patrol paths, and look indicators render correctly and update dynamically.
